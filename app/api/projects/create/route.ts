@@ -31,9 +31,6 @@ export async function POST(req: NextRequest) {
   }
 
   const projectPath = path.join(WORKSPACE, name)
-  if (fs.existsSync(projectPath)) {
-    return NextResponse.json({ error: `Directory already exists: ${projectPath}` }, { status: 400 })
-  }
 
   if (!fs.existsSync(SCRIPT)) {
     return NextResponse.json(

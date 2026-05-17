@@ -22,6 +22,17 @@ export default function CreateProgressPage({
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
+    if (status !== 'running') return
+    const interval = setInterval(() => {
+      setLogs((prev) => [
+        ...prev,
+        '[creator] ⏱  Still running — checking again in 1 minute…',
+      ])
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [status])
+
+  useEffect(() => {
     const source = new EventSource(`/api/projects/${jobId}/stream`)
 
     source.onmessage = (e) => {
@@ -50,40 +61,53 @@ export default function CreateProgressPage({
   }, [jobId])
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-      <div className="max-w-4xl mx-auto w-full px-6 py-10 flex flex-col flex-1">
-        <Link
-          href="/"
-          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mb-6 inline-block"
-        >
-          ← Dashboard
-        </Link>
-
-        <div className="flex items-center gap-3 mb-4">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50">Creating project</h1>
+    <main className="h-screen bg-gray-50 dark:bg-gray-950 flex flex-col overflow-hidden">
+      {/* Fixed header — always visible */}
+      <div className="shrink-0 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 px-6 py-4">
+        <div className="max-w-4xl mx-auto w-full">
+          <Link
+            href="/"
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mb-3 inline-block"
+          >
+            ← Dashboard
+          </Link>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50">Creating project</h1>
+            {status === 'running' && (
+              <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                Running
+              </span>
+            )}
+            {status === 'done' && (
+              <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Done
+              </span>
+            )}
+            {status === 'error' && (
+              <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                Failed
+              </span>
+            )}
+          </div>
           {status === 'running' && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 animate-pulse">
-              Running
-            </span>
-          )}
-          {status === 'done' && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
-              Done
-            </span>
-          )}
-          {status === 'error' && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
-              Failed
-            </span>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              Setting up GitHub, Supabase, Vercel and scaffolding your app…
+            </p>
           )}
         </div>
+      </div>
 
-        <div className="flex-1 min-h-[400px]">
-          <LogStream logs={logs} />
+      {/* Log area — fills remaining space, scrolls internally */}
+      <div className="flex-1 overflow-hidden flex flex-col max-w-4xl mx-auto w-full px-6 py-4">
+        <div className="flex-1 overflow-hidden">
+          <LogStream logs={logs} running={status === 'running'} />
         </div>
 
         {status === 'done' && result && (
-          <div className="mt-6 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-5">
+          <div className="shrink-0 mt-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-5">
             <p className="font-semibold text-emerald-800 dark:text-emerald-300 mb-3">
               Project created successfully!
             </p>
@@ -129,7 +153,7 @@ export default function CreateProgressPage({
         )}
 
         {status === 'error' && (
-          <div className="mt-6 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-5">
+          <div className="shrink-0 mt-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-5">
             <p className="font-semibold text-red-800 dark:text-red-300 mb-1">Creation failed</p>
             {errorMsg && <p className="text-sm text-red-600 dark:text-red-400">{errorMsg}</p>}
             <Link

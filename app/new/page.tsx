@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -16,9 +16,27 @@ export default function NewProjectPage() {
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [dirExists, setDirExists] = useState(false)
+  const checkRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const name = toProjectName(title)
   const nameValid = /^[a-z][a-z0-9-]*[a-z0-9]$|^[a-z]$/.test(name)
+
+  // Debounced existence check
+  useEffect(() => {
+    setDirExists(false)
+    if (!nameValid) return
+    if (checkRef.current) clearTimeout(checkRef.current)
+    checkRef.current = setTimeout(() => {
+      fetch(`/api/projects/exists?name=${encodeURIComponent(name)}`)
+        .then((r) => r.json())
+        .then((d) => setDirExists(d.exists))
+        .catch(() => {})
+    }, 300)
+    return () => {
+      if (checkRef.current) clearTimeout(checkRef.current)
+    }
+  }, [name, nameValid])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -91,6 +109,21 @@ export default function NewProjectPage() {
             )}
           </div>
 
+          {dirExists && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
+              <span className="text-amber-500 text-sm mt-0.5">⚠</span>
+              <div>
+                <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+                  Directory already exists
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                  The script will resume from where it left off — already-completed steps
+                  (GitHub, Supabase, Vercel, scaffold) will be skipped automatically.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Description
@@ -116,7 +149,7 @@ export default function NewProjectPage() {
             disabled={loading || !nameValid || !title.trim()}
             className="px-4 py-2.5 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {loading ? 'Starting…' : 'Create project'}
+            {loading ? 'Starting…' : dirExists ? 'Resume creation' : 'Create project'}
           </button>
         </form>
       </div>
