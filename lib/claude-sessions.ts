@@ -1,8 +1,19 @@
 import fs from 'fs'
 import os from 'os'
-import { spawn } from 'child_process'
+import path from 'path'
+import { spawn, execFile } from 'child_process'
+import { promisify } from 'util'
 
+const execFileAsync = promisify(execFile)
 const CLAUDE_BIN = '/home/gabriele/.local/bin/claude'
+const HOME = os.homedir()
+const EXTRA_PATH = `/home/gabriele/.local/bin:/usr/local/bin:/usr/bin:/bin`
+
+const ENV = {
+  ...process.env,
+  HOME,
+  PATH: `${EXTRA_PATH}:${process.env.PATH ?? ''}`,
+}
 
 export function findClaudePid(projectPath: string): number | null {
   let resolved: string
@@ -18,7 +29,6 @@ export function findClaudePid(projectPath: string): number | null {
       try {
         const cmdline = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf-8').replace(/\0/g, ' ')
         const cwd = fs.realpathSync(`/proc/${pid}/cwd`)
-        // cmdline shows "claude remote-control" (no --), match either form
         if (
           cmdline.includes('claude') &&
           cmdline.includes('remote-control') &&
@@ -35,19 +45,84 @@ export function findClaudePid(projectPath: string): number | null {
   return null
 }
 
-export function startClaudeSession(projectPath: string, sessionName: string): void {
-  // claude remote-control needs a real TTY — use a detached tmux session to provide one
-  const tmuxSession = `claude-${sessionName}`
-  const cmd = `${CLAUDE_BIN} remote-control --dangerously-skip-permissions`
+function sleep(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms))
+}
 
-  const child = spawn(
-    'tmux',
-    ['new-session', '-d', '-s', tmuxSession, '-c', projectPath, cmd],
-    {
-      detached: true,
-      stdio: 'ignore',
-      env: { ...process.env, HOME: os.homedir() },
-    }
-  )
-  child.unref()
+async function tmuxKill(session: string) {
+  try {
+    await execFileAsync('tmux', ['kill-session', '-t', session], { env: ENV })
+  } catch {
+    // session may not exist
+  }
+}
+
+async function tmuxCapture(session: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync('tmux', ['capture-pane', '-t', session, '-p'], { env: ENV })
+    return stdout
+  } catch {
+    return ''
+  }
+}
+
+async function startRemoteControl(session: string, projectPath: string, name: string) {
+  await tmuxKill(session)
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(
+      'tmux',
+      [
+        'new-session', '-d',
+        '-s', session,
+        '-c', projectPath,
+        CLAUDE_BIN, 'remote-control',
+        '--permission-mode', 'bypassPermissions',
+        '--spawn', 'same-dir',
+        '--name', name,
+      ],
+      { detached: true, stdio: 'ignore', env: ENV }
+    )
+    child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`tmux exited ${code}`))))
+    child.unref()
+  })
+}
+
+async function acceptWorkspaceTrust(projectPath: string, name: string) {
+  const trustSession = `trust-${name}`
+  await tmuxKill(trustSession)
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(
+      'tmux',
+      ['new-session', '-d', '-s', trustSession, '-c', projectPath, CLAUDE_BIN],
+      { detached: true, stdio: 'ignore', env: ENV }
+    )
+    child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`trust tmux exited ${code}`))))
+    child.unref()
+  })
+
+  // Wait for the trust dialog to render, then press Enter to accept "Yes, I trust this folder"
+  await sleep(3000)
+  await execFileAsync('tmux', ['send-keys', '-t', trustSession, '', ''], { env: ENV })
+  await sleep(500)
+  await execFileAsync('tmux', ['send-keys', '-t', trustSession, 'Enter', ''], { env: ENV })
+  await sleep(1500)
+  await tmuxKill(trustSession)
+}
+
+export async function startClaudeSession(projectPath: string, sessionName: string): Promise<void> {
+  const tmuxSession = `claude-${sessionName}`
+
+  await startRemoteControl(tmuxSession, projectPath, sessionName)
+
+  // Give the process 2s to either start cleanly or fail with "Workspace not trusted"
+  await sleep(2000)
+  const output = await tmuxCapture(tmuxSession)
+
+  if (output.includes('Workspace not trusted')) {
+    await tmuxKill(tmuxSession)
+    await acceptWorkspaceTrust(projectPath, sessionName)
+    // Retry remote-control now that the workspace is trusted
+    await startRemoteControl(tmuxSession, projectPath, sessionName)
+  }
 }

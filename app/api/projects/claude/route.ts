@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ running: true, pid: existingPid })
   }
 
-  startClaudeSession(projectPath, name)
+  try {
+    await startClaudeSession(projectPath, name)
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 })
+  }
   return NextResponse.json({ started: true })
 }
