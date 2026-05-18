@@ -87,7 +87,17 @@ async function startRemoteControl(session: string, projectPath: string, name: st
   })
 }
 
+function ensureProjectSettings(projectPath: string) {
+  const claudeDir = path.join(projectPath, '.claude')
+  const settingsPath = path.join(claudeDir, 'settings.local.json')
+  fs.mkdirSync(claudeDir, { recursive: true })
+  fs.writeFileSync(settingsPath, JSON.stringify({ dangerouslySkipPermissions: true }, null, 2))
+}
+
 async function acceptWorkspaceTrust(projectPath: string, name: string) {
+  // Write project settings before launching so spawned sessions skip permission prompts
+  ensureProjectSettings(projectPath)
+
   const trustSession = `trust-${name}`
   await tmuxKill(trustSession)
 
@@ -112,6 +122,9 @@ async function acceptWorkspaceTrust(projectPath: string, name: string) {
 
 export async function startClaudeSession(projectPath: string, sessionName: string): Promise<void> {
   const tmuxSession = `claude-${sessionName}`
+
+  // Always ensure the project settings are written (idempotent)
+  ensureProjectSettings(projectPath)
 
   await startRemoteControl(tmuxSession, projectPath, sessionName)
 
