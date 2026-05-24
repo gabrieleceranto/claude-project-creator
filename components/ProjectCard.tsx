@@ -1,5 +1,6 @@
 import { Project } from '@/lib/workspace'
 import { ClaudeButton } from './ClaudeButton'
+import { AddSupabaseButton } from './AddSupabaseButton'
 
 function ExternalIcon() {
   return (
@@ -60,6 +61,11 @@ export function ProjectCard({ project }: { project: Project }) {
 
       <div className="flex flex-wrap gap-2 mt-auto pt-1">
         <LinkBadge
+          href={project.siteUrl}
+          label="Website"
+          colorClass="bg-blue-600 text-white dark:bg-blue-500"
+        />
+        <LinkBadge
           href={project.vercelUrl}
           label="Vercel"
           colorClass="bg-black text-white dark:bg-white dark:text-black"
@@ -69,11 +75,15 @@ export function ProjectCard({ project }: { project: Project }) {
           label="GitHub"
           colorClass="bg-gray-800 text-white dark:bg-gray-700"
         />
-        <LinkBadge
-          href={project.supabaseUrl}
-          label="Supabase"
-          colorClass="bg-emerald-600 text-white"
-        />
+        {project.supabaseUrl ? (
+          <LinkBadge
+            href={project.supabaseUrl}
+            label="Supabase"
+            colorClass="bg-emerald-600 text-white"
+          />
+        ) : (
+          <AddSupabaseButton projectName={project.name} />
+        )}
       </div>
 
       <div className="border-t border-gray-100 dark:border-gray-800 pt-3">

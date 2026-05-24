@@ -9,6 +9,7 @@ export interface Project {
   name: string
   title: string
   description: string
+  siteUrl: string
   vercelUrl: string
   githubUrl: string
   supabaseUrl: string
@@ -32,12 +33,16 @@ export function scanProjects(): Project[] {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
       if (!pkg.creator) continue
+      const name = entry.name  // directory name is authoritative; pkg.name may be 'scaffold' from create-next-app
+      const vercelUrl = pkg.homepage || ''
+      const storedSite = pkg.creator.site || ''
       projects.push({
-        id: pkg.name || entry.name,
-        name: pkg.name || entry.name,
-        title: pkg.creator.title || pkg.name || entry.name,
+        id: name,
+        name,
+        title: pkg.creator.title || pkg.name || name,
         description: pkg.description || '',
-        vercelUrl: pkg.homepage || '',
+        siteUrl: storedSite,
+        vercelUrl,
         githubUrl: pkg.creator.github || '',
         supabaseUrl: pkg.creator.supabase || '',
         localPath: path.join(WORKSPACE, entry.name),
@@ -60,6 +65,7 @@ export function patchPackageJson(
   fields: {
     title: string
     description?: string
+    siteUrl?: string
     vercelUrl?: string
     githubUrl?: string
     supabaseUrl?: string
@@ -72,6 +78,7 @@ export function patchPackageJson(
   if (fields.vercelUrl) pkg.homepage = fields.vercelUrl
   pkg.creator = {
     title: fields.title,
+    site: fields.siteUrl || pkg.creator?.site || '',
     github: fields.githubUrl || pkg.creator?.github || '',
     supabase: fields.supabaseUrl || pkg.creator?.supabase || '',
     createdAt: fields.createdAt || pkg.creator?.createdAt || new Date().toISOString(),

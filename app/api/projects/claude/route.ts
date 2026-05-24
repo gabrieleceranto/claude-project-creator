@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { findClaudePid, startClaudeSession } from '@/lib/claude-sessions'
+import { findClaudePid, startClaudeSession, killClaudeSession } from '@/lib/claude-sessions'
 
 export async function GET(req: NextRequest) {
   const projectPath = req.nextUrl.searchParams.get('path')
@@ -26,4 +26,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
   return NextResponse.json({ started: true })
+}
+
+export async function DELETE(req: NextRequest) {
+  const { path: projectPath, name } = await req.json()
+  if (!projectPath || !name) {
+    return NextResponse.json({ error: 'path and name required' }, { status: 400 })
+  }
+  try {
+    await killClaudeSession(projectPath, name)
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 })
+  }
+  return NextResponse.json({ killed: true })
 }

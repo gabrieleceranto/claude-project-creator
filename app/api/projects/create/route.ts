@@ -6,6 +6,7 @@ import os from 'os'
 import fs from 'fs'
 import { createJob, appendLog, finishJob, failJob, getJob } from '@/lib/jobs'
 import { patchPackageJson, WORKSPACE } from '@/lib/workspace'
+import { readVercelToken, fetchVercelSiteUrl } from '@/lib/vercel'
 
 const SCRIPT = path.join(
   os.homedir(),
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
   child.stdout.on('data', feed)
   child.stderr.on('data', feed)
 
-  child.on('close', (code) => {
+  child.on('close', async (code) => {
     const job = getJob(jobId)
     const fullOutput = job?.logs.map(stripAnsi).join('\n') || ''
 
@@ -82,10 +83,13 @@ export async function POST(req: NextRequest) {
     const supabaseUrl = supabaseMatch?.[1] ?? ''
 
     if (code === 0) {
+      const token = readVercelToken()
+      const siteUrl = token && vercelUrl ? await fetchVercelSiteUrl(name, token) : ''
       try {
         patchPackageJson(projectPath, {
           title,
           description: description || '',
+          siteUrl,
           vercelUrl,
           githubUrl,
           supabaseUrl,

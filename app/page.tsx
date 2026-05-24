@@ -1,13 +1,17 @@
 import Link from 'next/link'
-import { scanProjects } from '@/lib/workspace'
+import path from 'path'
+import { scanProjects, WORKSPACE } from '@/lib/workspace'
 import { getEnvStatus } from '@/lib/env-config'
+import { resolveProjectUrls } from '@/lib/vercel'
 import { ProjectCard } from '@/components/ProjectCard'
+import { ClaudeButton } from '@/components/ClaudeButton'
 
 export const dynamic = 'force-dynamic'
 
-export default function Dashboard() {
-  const projects = scanProjects()
+export default async function Dashboard() {
+  const projects = await resolveProjectUrls(scanProjects())
   const env = getEnvStatus()
+  const creatorPath = path.join(WORKSPACE, 'creator')
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -18,6 +22,9 @@ export default function Dashboard() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {projects.length} project{projects.length !== 1 ? 's' : ''}
             </p>
+            <div className="mt-2">
+              <ClaudeButton localPath={creatorPath} projectName="creator" />
+            </div>
           </div>
           <Link
             href="/new"

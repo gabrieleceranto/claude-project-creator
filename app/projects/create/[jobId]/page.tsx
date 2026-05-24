@@ -12,10 +12,14 @@ interface DoneResult {
 
 export default function CreateProgressPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ jobId: string }>
+  searchParams: Promise<{ label?: string }>
 }) {
   const { jobId } = use(params)
+  const { label } = use(searchParams)
+  const pageTitle = label ? decodeURIComponent(label) : 'Creating project'
   const [logs, setLogs] = useState<string[]>([])
   const [status, setStatus] = useState<'running' | 'done' | 'error'>('running')
   const [result, setResult] = useState<DoneResult | null>(null)
@@ -72,7 +76,7 @@ export default function CreateProgressPage({
             ← Dashboard
           </Link>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50">Creating project</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50">{pageTitle}</h1>
             {status === 'running' && (
               <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
@@ -94,7 +98,7 @@ export default function CreateProgressPage({
           </div>
           {status === 'running' && (
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Setting up GitHub, Supabase, Vercel and scaffolding your app…
+              {label ? decodeURIComponent(label) + '…' : 'Setting up GitHub, Vercel and scaffolding your app…'}
             </p>
           )}
         </div>
